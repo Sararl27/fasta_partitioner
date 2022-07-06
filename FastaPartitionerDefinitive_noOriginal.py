@@ -1,16 +1,52 @@
-
+import os
 import re
 import lithops
 import json
 import gc
 import time
+import json
+
+dict = [{
+  "id": "04",
+  "name": "sunil",
+  "department": "HR"
+} , {
+  "id": "03",
+  "name": "sunil33",
+  "department": "H3R"
+} ]
+
+with open(f'./output_data/test.json', 'w') as f:
+    #json.dump(dict, f)
+    f.write(
+      '[' +
+      ',\n'.join(json.dumps(i) for i in dict) +
+      ']\n')
+
+with open('./output_data/test.json') as f:
+  data = json.load(f)
+
+print(data)
+print(data[0]['id'])
+
+print()
+
+characters = ['Tokyo', 'Lisbon', 'Moscow', 'Berlin']
+new_characters = ['Nairobi', 'Denver', 'Rio']
+characters.append(new_characters)
+print('"append" list:', characters)
+characters = ['Tokyo', 'Lisbon', 'Moscow', 'Berlin']
+characters.extend(new_characters)
+print('"extend" list:', characters)
+
+print()
+
+print('Primera part de >tr|A0A7X8NEN1|A0A7X8NEN1_9ACTN Glutamate racemase OS=Olsenella sp. KGMB02461 OX=2726201 GN=murI PE=3 SV=1:\n\t'
+      + '>tr|A0A7X8NEN1|A0A7X8NEN1_9ACTN Glutamate racemase OS=Olsenella sp. KGMB02461 OX=2726201 GN=murI PE=3 SV=1'.split(' ')[0])
 
 
 
-
-
-
-class PartitionFasta():
+'''class PartitionFasta():
 
         
 
@@ -22,8 +58,11 @@ class PartitionFasta():
         
 
     #Generate metadata from fasta file
-    def generate_chunks(self,obj,total_obj_size,obj_size,overlap):
-        data = obj.data_stream.sb.read().decode('utf-8')
+    def generate_chunks(self, obj, obje,key,total_obj_size,obj_size,overlap):
+        data = storage.get_object(obje, key).decode('utf-8')
+        # data = obj.data_stream.sb.read().decode('utf-8')
+        # with open(obj, "r", encoding='utf-8') as f:
+        #    data = f.read()
         FASTA_HEADER = r">.+\n"
         content = ""
         found = False
@@ -34,7 +73,7 @@ class PartitionFasta():
         prev = ""
         for m in titles:
             found = True
-            start =  obj.data_byte_range[0] + m.start()
+            start = obj.data_byte_range[0] + m.start()
             if i == 0:
                 if obj.part >= 1:
                     if start > (obj.part)*obj.chunk_size: 
@@ -83,46 +122,69 @@ def print_chunk_info(obj):
     print(obj.chunk_size)  # in bytes
     print("===================")
 
-def run_worker_metadata(obj,storage,my_bucket_name,total_obj_size,obj_size):
-    print_chunk_info(obj)
+def run_worker_metadata(my_bucket_name, key, total_obj_size,obj_size):
+    #print_chunk_info(obj)
     partitioner = PartitionFasta(storage,my_bucket_name,obj)
-    dades = partitioner.generate_chunks(obj,total_obj_size,obj_size)
+    # dades = partitioner.generate_chunks(obj, total_obj_size, obj_size, '')
+    dades = partitioner.generate_chunks(obj, my_bucket_name, key, total_obj_size, obj_size, '')
     return dades
 
 
+def push_object_funct(input_dir, data_bucket, input_data_prefix):
+    bucket_objects = storage.list_keys(bucket=data_bucket)
+    for subdir, dirs, files in os.walk(local_input_path):
+        print(subdir)
+        for file_name in files:
+            key = os.path.join(input_data_prefix, file_name)  # Added
+            if key not in bucket_objects:   # Changed: if file_name not in bucket_objects:
+                with open(os.path.join(subdir, file_name), 'rb') as file: #Changed
+                    print(f'\tUploading {key}...')
+                    data = file.read()
+                    storage.put_object(bucket=data_bucket, key=key, body=data)
+                    print('\tOk!')
+            else:   # Added
+                print(f'\tIt is already uploaded: {key}...')   # Added
+    print("Finished!")
+
+    return storage.list_keys(bucket=data_bucket)
 
 
     
 #s3://sra-pub-src-2/SRR8774337/cleaned.fasta
 
 if __name__ == "__main__":
-    fexec = lithops.FunctionExecutor(
-        log_level='DEBUG',runtime='testcontainer',runtime_memory=4096, max_workers=1000)
-    
-    obj = 's3://ayman-lithops-meta-cloudbutton-hutton/fasta/hg19.fa'  # Change-me
-    my_bucket_name = 'ayman-lithops-meta-cloudbutton-hutton' # Change-me
-    
+    storage = lithops.Storage()
+    # obj = 's3://ayman-lithops-meta-cloudbutton-hutton/fasta/hg19.fa'  # Change-me
+    my_bucket_name = 'cloudbutton-hutton' # Change-me
+    local_input_path = './input_data/' # Change-me
+    path_obj = push_object_funct(local_input_path, my_bucket_name, 'fasta')
+    print(path_obj[0])
+    obj = f'cos://{my_bucket_name}/{path_obj[0]}'
+
+    fexec = lithops.LocalhostExecutor()
+
     location = obj.split('//')[1].split('/')
     for_head = location[1:]
     for_head = '/'.join(for_head)
-    data_bucket_name = location[0]  
+    data_bucket_name = location[0]
     ovlp = 300
     storage = lithops.Storage()
     worker_chunk_size = 500000000
-    fasta = storage.head_object(data_bucket_name, for_head) 
-    total_fasta_size = int(fasta['content-length'])/worker_chunk_size
+    fasta = storage.head_object(data_bucket_name, for_head)
+    total_fasta_size = int(fasta['content-length']) / worker_chunk_size
     seq_name = location[-1].split('.')[0]
-  
-    
     print('===================================================================================')
-    print('# metadata chunks: '+ str(int(total_fasta_size)))
+    print('# metadata chunks: ' + str(int(total_fasta_size)))
     print('bucket to access data: ' + str(data_bucket_name))
     print('reference genome name: ' + str(seq_name))
     print('fasta size: ' + str(fasta['content-length']) + ' bytes')
     print('===================================================================================')
 
+    # local = './input_data/genes.fasta'
+    run_worker_metadata(my_bucket_name, path_obj[0], total_fasta_size, fasta['content-length'])
     fexec.map(run_worker_metadata, {'my_bucket_name':my_bucket_name,'obj':obj,'total_obj_size':total_fasta_size,'obj_size':fasta['content-length']},
             obj_chunk_size=worker_chunk_size)
+    
     fexec.wait()
     results = fexec.get_result()
 
@@ -132,4 +194,4 @@ if __name__ == "__main__":
                 print(k)
 
     fexec.plot()
-    fexec.clean()
+    fexec.clean()'''
