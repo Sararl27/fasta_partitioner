@@ -9,7 +9,7 @@ import json
 import gc
 
 
-class PartitionFasta():
+class PartitionFasta:
 
     def __init__(self, storage, my_bucket_name, obj):
         self.storage = storage
@@ -42,9 +42,9 @@ class PartitionFasta():
                     treated_first_sequence = True
                     if obj.part >= 1 and start > obj.part * obj.chunk_size:  # If it is not the worker of the first part of the file and in addition it
                                                                              # turns out that the partition begins in the middle of the data of a sequence
-                        # >> num_chunks_has_divided offset_head offset_bases_split
 
-                       # content.append(data[0:m.start()])
+                        # content.append(data[0:m.start()])
+                        # >> num_chunks_has_divided offset_head offset_bases_split
                        content.append('>>' + ' ' + 'X' + ' ' + 'Y' + ' ' + str(obj.part * obj.chunk_size))  # Split sequences
                 # ------------------------------------------------
                 # TODO saber que fa i si es útil consevar-ho
@@ -65,8 +65,8 @@ class PartitionFasta():
                 last_el = [start + len(m.group()), m.group()]
 
         if last_el[0] >= (obj.part + 1) * obj.chunk_size and found:  # Check if the last head of the current one is cut
-            # >>>name_id num_chunks_has_divided offset_head offset_bases
-            content.append(f">>{last_el[1].split(' ')[0]}" + ' ' + '1' + ' ' + str(start) + ' ' + str(start + len(m.group())))
+            # >->name_id num_chunks_has_divided offset_head offset_bases
+            content.append(f">->{last_el[1].split(' ')[0]}" + ' ' + '1' + ' ' + str(start) + ' ' + str(start + len(m.group())))
             # content.append(str(last_el[0])+','+data[(m.start()+len(m.group()))::])
 
 
@@ -81,23 +81,6 @@ class PartitionFasta():
         self.storage.put_object(self.my_bucket_name, f'cache/chunk_{obj.part}_index.json', str(dict))
 
         return dict
-
-
-def reduce_generate_chunks():
-    # Trobar si hi ha algú worker que ha començat amb una secuencia partida i dir-li a quina secuencia pertany (>>
-    # num_particions offset -> nam_id  num_particions offset, i actualitzar num_particions de la secuencia que si
-    # tenia la part del head (0 -> x))
-    # S'ha d'actualitzar el rang en cas que just en un worker s'ha quedat el head (o parcialment) i un altre worker té tota la secuencia (i potser part del head)
-    # Comprovar només mirant la primera secuencia, si esta dividida, comprovar l'ultima secuencia de l'anterior chunk:
-    #     si té '>>>name_id': passar el head al següent chuhnk (i eliminar els simbols '>>>') i actualitzar rangs
-    #     si té '>>: copiar el head a l'index i donar-li el offset del head
-    head_sec = 's'
-    if '>>>' in f'>>{head_sec}':
-        print('success')
-    else:
-        print('no')
-
-
 
 
 def print_chunk_info(obj):
@@ -116,6 +99,42 @@ def run_worker_metadata(obj, storage, my_bucket_name, total_obj_size, obj_size):
     partitioner = PartitionFasta(storage, my_bucket_name, obj)
     dades = partitioner.generate_chunks(obj, total_obj_size, obj_size)
     return dades
+
+
+def reduce_generate_chunks(results):
+    # · Trobar si hi ha algú worker que ha començat amb una secuencia partida i dir-li a quina secuencia pertany (>>
+    #   num_particions offset -> nam_id  num_particions offset, i actualitzar num_particions de la secuencia que si
+    #   tenia la part del head (0 -> x))
+    # · S'ha d'actualitzar el rang en cas que just en un worker s'ha quedat el head (o parcialment) i un altre worker té tota la secuencia (i potser part del head)
+    # · Comprovar només mirant la primera secuencia, si esta dividida, comprovar l'ultima secuencia de l'anterior chunk:
+    #     - si té '>>>name_id': passar el head al següent chuhnk (i eliminar els simbols '>>>') i actualitzar rangs
+    #     - si té '>>: copiar el head a l'index i donar-li el offset del head
+    if len(results) > 1:
+        i = 0
+        for dict in results:
+            if i > 0:
+                if '>>' in dict['secuences'][0]:  # Comprovar que el primer index no porta >>
+                    leng_prev = len(results[i-1]['secuences'])
+                    sec_prev = results[i-1]['secuences'][leng_prev - 1]
+                    dict['secuences'][0] = dict['secuences'][0].replace('Y', sec_prev.split(' ')[2])   # Y -> offset_head
+                    # Comprovar que no hagi més d'una partició en una mateixa secuencia (s'ha d'actualitzar el nombre de particions de tots els afectats)
+                    if int(results[i-1]['secuences'][leng_prev - 1].split(' ')[1]) > 1: # If there are more than one split in the sequence
+                        for x in range(0, i + 1):
+                            dict['secuences'][0] = dict['secuences'][0].replace(i, i + 1)  # num_chunks_has_divided + 1 (i+1: total of current partitions of sequence)
+                    else: # If sequences is only split into two parts
+                        results[i - 1]['secuences'][leng_prev - 1].replace('1', i + 1)
+                        dict['secuences'][0] = dict['secuences'][0].replace('X', i + 1)
+                    dict['secuences'][0] = dict['secuences'][0].replace('>>', sec_prev.split(' ')[0])  # '>>' -> name_id
+
+                    # TODO ->
+                    # Actualizar rangos
+
+                elif '>->' in dict['secuences'][0]: # Comprovar que el primer index no porta >>:
+                    print('')
+            i += 1
+    else:
+        final_results = results
+    return final_results # results
 
 
 def push_object_funct(input_dir, data_bucket, input_data_prefix):
@@ -149,21 +168,22 @@ def generate_json(data, dt_dir):
 # s3://sra-pub-src-2/SRR8774337/cleaned.fasta
 
 if __name__ == "__main__":
-    # Param
+    # Params
     my_bucket_name = 'cloud-fasta-partitioner'  # Change-me
     local_input_path = './input_data/'  # Change-me
-    prefix = 'fasta/'
-    elem = f'{prefix}genes.fasta'
+    prefix = 'fasta/'  # Change-me
+    elem = f'{prefix}genes.fasta'  # Change-me
+
+    obj = f'cos://{my_bucket_name}/{elem}'  # f'{my_bucket_name}/{path_obj[0]}'  # Change-me
 
     # Execution
-    fexec = lithops.FunctionExecutor(log_level='DEBUG', max_workers=1000)
+    fexec = lithops.FunctionExecutor(log_level='DEBUG', max_workers=1000, runtime_memory=4096)
     storage = lithops.Storage()
 
-    # obj = 's3://ayman-lithops-meta-cloudbutton-hutton/fasta/hg19.fa'  # Change-me
+
 
     path_obj = push_object_funct(local_input_path, my_bucket_name, prefix)
     print(path_obj)
-    obj = f'cos://{my_bucket_name}/{elem}'  # f'{my_bucket_name}/{path_obj[0]}'
     print(obj)
 
     location = obj.split('//')[1].split('/')  # obj.split('/') #
@@ -171,7 +191,7 @@ if __name__ == "__main__":
     for_head = '/'.join(for_head)
     data_bucket_name = location[0]
     ovlp = 300
-    worker_chunk_size = 50000000  # 500000000
+    worker_chunk_size = 500000000  # 500000000
     fasta = storage.head_object(data_bucket_name, for_head)
     total_fasta_size = int(fasta['content-length']) / worker_chunk_size
     seq_name = location[-1].split('.')[0]
@@ -183,17 +203,15 @@ if __name__ == "__main__":
     print('fasta size: ' + str(fasta['content-length']) + ' bytes')
     print('===================================================================================')
 
-    # map_reduce
-    fexec.map(run_worker_metadata, {'my_bucket_name': my_bucket_name, 'obj': obj, 'total_obj_size': total_fasta_size,
-                                    'obj_size': fasta['content-length']}, obj_chunk_size=worker_chunk_size)
+    map_iterdata = {'my_bucket_name': my_bucket_name, 'obj': obj, 'total_obj_size': total_fasta_size, 'obj_size': fasta['content-length']}
+    fexec.map_reduce(map_function=run_worker_metadata,map_iterdata=map_iterdata, reduce_function=reduce_generate_chunks, obj_chunk_size=worker_chunk_size)
     fexec.wait()
     results = fexec.get_result()
 
-    generate_json(results, f'./output_data/{pathlib.Path(elem).stem}_index')
-
-
-    for el in results:
-        print(el)
+    #generate_json(results, f'./output_data/{pathlib.Path(elem).stem}_index')
+    print(results)
+    '''for el in results:
+        print(el['min_range'])'''
 
     fexec.plot()
     fexec.clean()
