@@ -79,7 +79,8 @@ results = [{"min_range": "0",
 
 x = 1
 for dict in results:
-    dict['secuences'][x] = 'a'   # Y -> offset_head
+    di = dict['secuences']
+    di[x] = 'aaaaaa'   # Y -> offset_head
     print(dict['secuences'][x])
     x += 1
 
