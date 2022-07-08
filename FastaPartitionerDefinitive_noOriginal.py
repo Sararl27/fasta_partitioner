@@ -85,8 +85,9 @@ for dict in results:
 
 print(results)
 
+print()
 
-
+print(list({'x': range(20)}))
 '''class PartitionFasta():
 
         
