@@ -41,7 +41,7 @@ print('"extend" list:', characters)
 
 print()
 
-head_sec = '>>>tr|A0A7X8NEN1|A0A7X8NEN1_9ACTN>>> Glutamate racemase OS=Olsenella sp. KGMB02461 OX=2726201 GN=murI PE=3 SV=1'
+head_sec = '>>>tr|A0A7X8NEN1|A0A7X8NEN1_9ACTN>>>' # Glutamate racemase OS=Olsenella sp. KGMB02461 OX=2726201 GN=murI PE=3 SV=1'
 print(f'Primera part de {head_sec}:\n\t'
       + head_sec.split(' ')[0])
 print(f'Tret > de {head_sec}:\n\t'
@@ -87,7 +87,9 @@ print(results)
 
 print()
 
-print(list({'x': range(20)}))
+for i in []:
+    print('b')
+print('Finished')
 '''class PartitionFasta():
 
         

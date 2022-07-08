@@ -155,7 +155,6 @@ if __name__ == "__main__":
     for_head = location[1:]
     for_head = '/'.join(for_head)
     data_bucket_name = location[0]
-    ovlp = 300
     worker_chunk_size = 50000000  # 500000000
     fasta = storage.head_object(data_bucket_name, for_head)
     total_fasta_size = int(fasta['content-length']) / worker_chunk_size
