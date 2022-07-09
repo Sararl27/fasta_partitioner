@@ -38,8 +38,8 @@ class PartitionFasta:
                                                                 # turns out that the partition begins in the middle of the base of a sequence.
                                                                 # (start-1): avoid having a split sequence in the index that only has '\n'
                         first_line = re.search('[^\s\n)]+', data).group()  # Match until space or '\n'
-                        # >> num_chunks_has_divided offset_head offset_bases_split
-                        content.append(f">> X Y {str(min_range)} {first_line}")  # Split sequences
+                        # >> num_chunks_has_divided offset_head offset_bases_split first_line_before_space_or_\n
+                        content.append(f">> <X> <Y> {str(min_range)} ^{first_line}^")  # Split sequences
 
                 if str(prev) != str(start):  # When if the current sequence base is not empty
                                              # name_id num_chunks_has_divided offset_head offset_bases
@@ -78,7 +78,7 @@ def reduce_generate_chunks(results):
                     if '<->' in seq_range_prev[i_seq_prev]:  # If the split was after a space, then there is all id
                         name_id = seq_prev.split(' ')[0].replace('<->', '')
                     else:
-                        name_id = seq_prev.split(' ')[0].replace('<_>', '') + text
+                        name_id = seq_prev.split(' ')[0].replace('<_>', '') + text.replace('^', '')
                     offset_head = seq_prev.split(' ')[1]
                     seq_range_prev.pop()  # Remove previous sequence
                     split = 0
@@ -90,13 +90,13 @@ def reduce_generate_chunks(results):
                     offset_head = seq_prev.split(' ')[2]
                     split = int(seq_prev.split(' ')[1])
                     # Update number of partitions of the sequence
-                    for x in range(i - split, i):  # update previous sequences
+                    for x in range(i - split, i):  # Update previous sequences
                         results[x]['sequences'][i_seq_prev] = results[x]['sequences'][i_seq_prev].replace(
                             f' {split} ',
                             f' {split + 1} ')  # num_chunks_has_divided + 1 (i+1: total of current partitions of sequence)
-                dictio[0] = dictio[0].replace(' X ', f' {str(split + 1)} ')  # X --> num_chunks_has_divided
-                dictio[0] = dictio[0].replace(' Y ', f' {offset_head} ')  # Y --> offset_head
-                dictio[0] = dictio[0].replace(f' {text}', '')  # remove 4rt param
+                dictio[0] = dictio[0].replace(f' {text}', '')  # Remove 4rt param
+                dictio[0] = dictio[0].replace(' <X> ', f' {str(split + 1)} ')  # X --> num_chunks_has_divided
+                dictio[0] = dictio[0].replace(' <Y> ', f' {offset_head} ')  # Y --> offset_head
                 dictio[0] = dictio[0].replace('>> ', f'{name_id} ')  # '>>' -> name_id
             i += 1
     return results  # results
