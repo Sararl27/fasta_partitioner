@@ -64,14 +64,16 @@ def run_worker_metadata(key, id, storage, bucket, chunk_size, obj_size, partitio
 
 
 def reduce_generate_chunks(results):
+    text = []
     if len(results) > 1:
         i = 0
         for dict in results:
             dictio = dict['sequences']
             dict_prev = results[i - 1]
             seq_range_prev = dict_prev['sequences']
-            if i > 0 or dict['sequences'] and seq_range_prev and '>>' in dictio[0]:  # If i > 0 and not empty the current and previous dictionary and the first sequence is split
-                text = dictio[0].split(' ')[4]
+            if i > 0 or seq_range_prev and dictio and '>>' in dictio[0]:  # If i > 0 and not empty the current and previous dictionary and the first sequence is split
+                text.append(dictio[0])
+                '''#text = dictio[0].split(' ')[4]
                 i_seq_prev = len(seq_range_prev) - 1  # Index of the last sequence of the previous range
                 seq_prev = seq_range_prev[i_seq_prev]
                 if '<->' in seq_prev or '<_>' in seq_prev:
@@ -97,9 +99,9 @@ def reduce_generate_chunks(results):
                 dictio[0] = dictio[0].replace(f' {text}', '')  # Remove 4rt param
                 dictio[0] = dictio[0].replace(' <X> ', f' {str(split + 1)} ')  # X --> num_chunks_has_divided
                 dictio[0] = dictio[0].replace(' <Y> ', f' {offset_head} ')  # Y --> offset_head
-                dictio[0] = dictio[0].replace('>> ', f'{name_id} ')  # '>>' -> name_id
+                dictio[0] = dictio[0].replace('>> ', f'{name_id} ')  # '>>' -> name_id'''
             i += 1
-    return results  # results
+    return text  # results
 
 
 def push_object_funct(local_input_path, data_bucket, input_data_prefix):
@@ -138,7 +140,7 @@ if __name__ == "__main__":
     key = f'fasta/genes.fasta'  # Change-me
     obj = f'{data_bucket}/{key}'  # f'cos://{data_bucket}/{key}'  # Change-me
 
-    workers = 100  # Change-me
+    workers = 200  # Change-me
 
     # Execution
     path_obj = push_object_funct(local_input_path, data_bucket, prefix)
@@ -167,12 +169,14 @@ if __name__ == "__main__":
     fexec.wait()
     results = fexec.get_result()
 
-    generate_json(results, f'./output_data/{pathlib.Path(key).stem}_index')
+    with open(f'text.txt', 'w') as f:
+        f.write(str(results))
+    '''generate_json(results, f'./output_data/{pathlib.Path(key).stem}_index')
 
     i = 0
     for el in results:
         print(f"{str(i)}: {[el['min_range'], el['max_range']]}")
-        i += 1
+        i += 1'''
 
     # fexec.plot()
     fexec.clean()
