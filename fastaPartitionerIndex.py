@@ -99,12 +99,11 @@ class FastaPartitioner:
                         if '<->' in seq_range_prev[-1]:  # If the split was after a space, then there is all id
                             name_id = param_seq_prev[0].replace('<->', '')
                             length = param[4].split('-')[1]
-                            offset_base = param[3].split('-')[1]
                         else:
                             name_id = param_seq_prev[0].replace('<_>', '') + param[5].replace('^', '')
                             length = param[4].split('-')[1]
-                            offset_base = param[3].split('-')[0]
                         offset_head = param_seq_prev[1]
+                        offset_base = param[3].split('-')[1]
                         seq_range_prev.pop()  # Remove previous sequence
                         split = 0
                         # Update ranges
