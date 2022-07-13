@@ -126,7 +126,6 @@ class FastaPartitioner:
                     dictio[0] = dictio[0].replace(' <X> ', f' {str(split + 1)} ')  # X --> num_chunks_has_divided
                     dictio[0] = dictio[0].replace(' <Y> ', f' {offset_head} ')  # Y --> offset_head
                     dictio[0] = dictio[0].replace('>> ', f'{name_id} ')  # '>>' -> name_id
-
         return results
 
     def __generate_json(self, data, dt_dir):
