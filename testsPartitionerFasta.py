@@ -5,6 +5,7 @@ import re
 import fastaPartitionerIndex as fp
 import random
 
+result = []
 class TestPartitionOptions(unittest.TestCase):
     def setUp(self):
         with open('./output_data/genes_index.json', "r") as f:
@@ -18,7 +19,7 @@ class TestPartitionOptions(unittest.TestCase):
         for el in self.data_assert:
             if random.randint(0,4) == 0:
                 list.append(el.split('\t'))
-                if i > 300:
+                if i > 500:
                     break
                 i += 1
         list.extend([['tr|IAmFalse'], ['']])
@@ -31,10 +32,11 @@ class TestPartitionOptions(unittest.TestCase):
     def test_get_range_sequence(self):
         #list = [{'min': dict['min_range'], 'max': dict['max_range']} for dict in self.data]
         #range = list[random.randint(0, len(list))]
+        result.append(f"Test 'test_get_range_sequence'")
         for el in self.data:
             sequences = fp.get_sequences_of_range(self.data, el['min_range'], el['max_range'])
             self.assertEqual(len(sequences), len(el['sequences']))
-            #print(f"{el['min_range']}-{el['max_range']}: {sequences[0]}")
+            result.append(f"{el['min_range']}-{el['max_range']}: {sequences[0]}")
 
     def test_index_generated(self):
         j = 0

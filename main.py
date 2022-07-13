@@ -39,6 +39,13 @@ def generate_fasta_index_own(local_input_path, data_bucket, prefix, storage, key
     fp.FastaPartitioner(storage, data_bucket, key, workers)
 
 
+def test_partitioner_fasta():
+    unittest.TextTestRunner(verbosity=2).run(unittest.TestLoader().loadTestsFromModule(testsPartitionerFasta))
+    #print(f'{testsPartitionerFasta.result[0]}:')
+    #for i in testsPartitionerFasta.result[1:]:
+    #    print(f'\t{i}')
+
+
 if __name__ == "__main__":
     storage = lithops.Storage()
 
@@ -50,19 +57,13 @@ if __name__ == "__main__":
     key = f'fasta/genes.fasta'  # Change me
     obj = f'{data_bucket}/{key}'  # f'cos://{data_bucket}/{key}'  # Change me
 
-    workers = 1000  # Change me
+    workers = 4000  # Change me
 
     # Execution
     #generate_fasta_index_pyfaidx()
     generate_fasta_index_own(local_input_path, data_bucket, prefix, storage, key, workers)
 
     # run all tests with verbosity
-    unittest.TextTestRunner(verbosity=2).run(unittest.TestLoader().loadTestsFromModule(testsPartitionerFasta))
+    test_partitioner_fasta()
     # TODO descubrir pq da diferente offset de base entre ['tr|A0A068S3P6|A0A068S3P6_9FUNG', '1054', '1191018'] y ['tr|A0A068S3P6|A0A068S3P6_9FUNG', '1054', '1191156']
 
-    '''with open('./input_data/genes.fasta', "r") as f:
-        data = f.read()
-
-    print(data[1191009:1192228])
-
-    print(data[1191018:1192228])'''
