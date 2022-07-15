@@ -1,4 +1,3 @@
-import re
 import unittest
 
 from pyfaidx import Fasta
@@ -36,7 +35,7 @@ def generate_fasta_index_pyfaidx():
 
 def generate_fasta_index_own(local_input_path, data_bucket, prefix, storage, key, workers):
     push_object_funct(local_input_path, data_bucket, prefix)
-    fp.FastaPartitioner(storage, data_bucket, key, workers)
+    fp.FastaIndex(storage, data_bucket, key, workers)
 
 
 def test_partitioner_fasta():
@@ -57,13 +56,13 @@ if __name__ == "__main__":
     key = f'fasta/genes.fasta'  # Change me
     obj = f'{data_bucket}/{key}'  # f'cos://{data_bucket}/{key}'  # Change me
 
-    workers = 4000  # Change me
+    workers = 1000  # Change me
 
     # Execution
     #generate_fasta_index_pyfaidx()
     generate_fasta_index_own(local_input_path, data_bucket, prefix, storage, key, workers)
 
     # run all tests with verbosity
-    test_partitioner_fasta()
+    #test_partitioner_fasta()
     # TODO descubrir pq da diferente offset de base entre ['tr|A0A068S3P6|A0A068S3P6_9FUNG', '1054', '1191018'] y ['tr|A0A068S3P6|A0A068S3P6_9FUNG', '1054', '1191156']
 

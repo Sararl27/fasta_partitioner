@@ -1,19 +1,19 @@
 import unittest
-import random
-import json
-import re
 import fastaPartitionerIndex as fp
 import random
 
 result = []
+
+#TODO: actualizar test con el nuevo formato
 class TestPartitionOptions(unittest.TestCase):
     def setUp(self):
-        with open('./output_data/genes_index.json', "r") as f:
-            self.data = json.load(f)
-        with open('./input_data/genes.fasta.fai', "r") as f:
-            self.data_assert = f.read().splitlines()
+        self.path_data = './output_data/genes_index.json'
+        self.path_data_assert = './input_data/genes.fasta.fai'
 
     def test_get_info_sequence(self):
+        with open(self.path_data_assert, 'r') as d:
+            seq_d_a = d.readline()
+        # Not updated
         i = 0
         list = []
         for el in self.data_assert:
@@ -30,6 +30,9 @@ class TestPartitionOptions(unittest.TestCase):
                 self.assertEqual([el[0], info['length'], info['offset']], [el[0], int(el[1]), int(el[2])])
 
     def test_get_range_sequence(self):
+        with open(self.path_data_assert, 'r') as d:
+            seq_d = d.readline()
+        # Not updated
         #list = [{'min': dict['min_range'], 'max': dict['max_range']} for dict in self.data]
         #range = list[random.randint(0, len(list))]
         result.append(f"Test 'test_get_range_sequence'")

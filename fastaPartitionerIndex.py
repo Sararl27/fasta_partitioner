@@ -1,10 +1,10 @@
-import json
 import pathlib
 import re
 import lithops
+from cuckooHash import HashTab
 
 
-class FastaPartitioner:
+class FastaIndex:
 
     def __init__(self, storage, bucket, key, workers):
         self.storage = storage
@@ -12,28 +12,55 @@ class FastaPartitioner:
 
         self.__generate_fasta_index(key, workers)
 
-    def __get_length(self, min_range, content, data, start_base, end_base):
-        start_base -= min_range
-        end_base -= min_range
-        len_base = len(data[start_base:end_base].replace('\n', ''))
-        # name_id num_chunks_has_divided offset_head offset_bases ->
-        # name_id num_chunks_has_divided offset_head offset_bases len_bases
-        content[-1] = f'{content[-1]} {len_base}'
+    def __get_length(self, min_range, hastab, key, data, start_base, end_base):
+        if key != '':
+            start_base -= min_range
+            end_base -= min_range
+            len_base = len(data[start_base:end_base].replace('\n', ''))
+            seq = hastab.find(key)
+            if seq is not None:
+                # name_id num_chunks_has_divided offset_head offset_bases ->
+                # name_id num_chunks_has_divided offset_head offset_bases len_bases
+                hastab.delete(key)
+                hastab.insert(key, f'{seq} {len_base}')
+                return False
+            return True
 
-    # Generate metadata from fasta file
+    def __update_number_of_partitions(self, split, i, dicts):
+        for x in range(i - split, i):  # Update previous sequences
+            seqs_prev = dicts[x]['sequences']
+            prev = dicts[x]['name_sequence'][-1]
+            seq = seqs_prev.find(prev)
+            if seq is not None:
+                # name_id num_chunks_has_divided offset_head offset_bases ->
+                # name_id num_chunks_has_divided offset_head offset_bases len_bases
+                self.__update_data_hastab_with_raplace(seqs_prev, prev, seq, f' {split} ',
+                                                       f' {split + 1} ')  # num_chunks_has_divided + 1 (i+1: total of current partitions of sequence))
+
+    def __update_data_hastab_with_raplace(self, hastab, key, sequence, before, after):
+        hastab.delete(key)  # If the key was found and deleted
+        seq = sequence.replace(before, after)
+        hastab.insert(key, seq)
+        return seq
+
+        # Generate metadata from fasta file
+
     def __generate_chunks(self, id, key, chunk_size, obj_size, partitions):
         min_range = id * chunk_size
         max_range = int(obj_size) if id == partitions - 1 else (id + 1) * chunk_size
         data = self.storage.get_object(bucket=self.bucket, key=key,
                                        extra_get_args={'Range': f'bytes={min_range}-{max_range - 1}'}).decode('utf-8')
-        content = []
         ini_heads = list(
             re.finditer(r"\n>", data))  # If it were '>' it would also find the ones inside the head information
         heads = list(re.finditer(r">.+\n", data))
-
+        len_head = len(heads)
+        ht = HashTab(len_head*2)
+        content = []
+        miss_prev_seq = False
         if ini_heads or data[
             0] == '>':  # If the list is not empty or there is > in the first byte (if is empty it will return an empty list)
             first_sequence = True
+            seq_prev = ''
             prev = -1
             for m in heads:
                 start = min_range + m.start()
@@ -57,82 +84,104 @@ class FastaPartitioner:
                                 length_base = f"{length_0}"
                                 offset = f'{offset_0}'
                             # >> num_chunks_has_divided offset_head offset_bases_split length/s first_line_before_space_or_\n
-                            content.append(f">> <X> <Y> {str(offset)} {length_base} ^{text}^")  # Split sequences
+                            ht.insert('first_split_sequence', f">> <X> <Y> {str(offset)} {length_base} ^{text}^")  # Split sequences
+                            content.append('first_split_sequence')
                         else:  # When the first header found is false, when in a split stream there is a split header that has a '>' inside (ex: >tr|...o-alpha-(1->5)-L-e...\n)
                             first_sequence = True
                             start = end = -1  # Avoid entering the following condition
                 if prev != start:  # When if the current sequence base is not empty
                     if prev != -1:
-                        self.__get_length(min_range, content, data, prev, start)
+                        miss_prev_seq = self.__get_length(min_range, ht, seq_prev, data, prev, start)
+                    id_seq = m.group().split(' ')[0].replace('>', '')
                     # name_id num_chunks_has_divided offset_head offset_bases
-                    content.append(f"{m.group().split(' ')[0].replace('>', '')} 1 {str(start)} {str(end)}")
+                    ht.insert(id_seq, f"{id_seq} 1 {str(start)} {str(end)}")
+                    content.append(id_seq)
+                    seq_prev = id_seq
+                if miss_prev_seq:
+                    break
                 prev = end
 
-            len_head = len(heads)
-            if ini_heads[-1].start() + 1 > heads[
+            if not miss_prev_seq and ini_heads[-1].start() + 1 > heads[
                 -1].start():  # Check if the last head of the current one is cut. (ini_heads[-1].start() + 1): ignore '\n'
                 last_seq_start = ini_heads[-1].start() + min_range + 1  # (... + 1): ignore '\n'
                 if len_head != 0:  # Add length of bases to last sequence
-                    self.__get_length(min_range, content, data, prev, last_seq_start)
-                text = data[last_seq_start - min_range::]
-                # [<->|<_>]name_id_split offset_head
-                content.append(
-                    f"{'<-' if ' ' in text else '<_'}{text.split(' ')[0]} {str(last_seq_start)}")  # if '<->' there is all id
-            elif len_head != 0:  # Add length of bases to last sequence
-                self.__get_length(min_range, content, data, prev, max_range)
+                    miss_prev_seq = self.__get_length(min_range, ht, seq_prev, data, prev, last_seq_start)
+                if not miss_prev_seq:
+                    text = data[last_seq_start - min_range::]
+                    # [<->|<_>]name_id_split offset_head
+                    ht.insert('all_id_sequence' if ' ' in text else 'half_id_sequence',
+                              f"{'<-' if ' ' in text else '<_'}{text.split(' ')[0]} {str(last_seq_start)}")  # if '<->' there is all id
+            elif not miss_prev_seq and len_head != 0:  # Add length of bases to last sequence
+                self.__get_length(min_range, ht, seq_prev, data, prev, max_range)
 
         return {'min_range': min_range,
                 'max_range': max_range,
-                'sequences': content}
+                'sequences': ht,  # if not miss_prev_seq else None
+                'name_sequence': content}  # if not miss_prev_seq else None
 
     def __reduce_generate_chunks(self, results):
-        if len(results) > 1:
-            for i, dict in enumerate(results):
-                dictio = dict['sequences']
-                dict_prev = results[i - 1]
-                seq_range_prev = dict_prev['sequences']
-                if i > 0 and seq_range_prev and dictio and '>>' in dictio[
-                    0]:  # If i > 0 and not empty the current and previous dictionary and the first sequence is split
-                    param = dictio[0].split(' ')
-                    seq_prev = seq_range_prev[-1]
-                    param_seq_prev = seq_prev.split(' ')
-                    if '<->' in seq_prev or '<_>' in seq_prev:
-                        if '<->' in seq_range_prev[-1]:  # If the split was after a space, then there is all id
-                            name_id = param_seq_prev[0].replace('<->', '')
-                            length = param[4].split('-')[1]
-                        else:
-                            name_id = param_seq_prev[0].replace('<_>', '') + param[5].replace('^', '')
-                            length = param[4].split('-')[1]
-                        offset_head = param_seq_prev[1]
-                        offset_base = param[3].split('-')[1]
-                        seq_range_prev.pop()  # Remove previous sequence
-                        split = 0
-                        # Update ranges
-                        dict['min_range'] = int(offset_head)
-                        dict_prev['max_range'] = int(offset_head)
-                    else:
-                        length = param[4].split('-')[0]
-                        name_id = param_seq_prev[0]
-                        offset_head = param_seq_prev[2]
-                        offset_base = param[3].split('-')[0]
-                        split = int(param_seq_prev[1])
-                        # Update number of partitions of the sequence
-                        for x in range(i - split, i):  # Update previous sequences
-                            results[x]['sequences'][-1] = results[x]['sequences'][-1].replace(
-                                f' {split} ',
-                                f' {split + 1} ')  # num_chunks_has_divided + 1 (i+1: total of current partitions of sequence)
-                    dictio[0] = dictio[0].replace(f' {param[5]}', '')  # Remove 4rt param
-                    dictio[0] = dictio[0].replace(f' {param[3]} ',
-                                                  f' {offset_base} ')  # [offset_base_0-offset_base_1|offset_base] -> offset_base
-                    dictio[0] = dictio[0].replace(f' {param[4]}', f' {length}')  # [length_0-length_1|length] -> length
-                    dictio[0] = dictio[0].replace(' <X> ', f' {str(split + 1)} ')  # X --> num_chunks_has_divided
-                    dictio[0] = dictio[0].replace(' <Y> ', f' {offset_head} ')  # Y --> offset_head
-                    dictio[0] = dictio[0].replace('>> ', f'{name_id} ')  # '>>' -> name_id
-        return results
+        res = []
 
-    def __generate_json(self, data, dt_dir):
-        with open(f'{dt_dir}.json', 'w') as f:
-            json.dump(data, f, indent=2)
+        x = y = 0
+        for e in results:
+            for i in e['name_sequence']:
+                if not e['sequences'].find(i):
+                    y += 1
+                x += 1
+        res.append(f'{y}/{x}')
+                #res.append(e['sequences'].find(i))
+        '''if len(results) > 1:
+            for i, dict in enumerate(results):
+                if dict['sequences'] is not None:
+                    dictio = dict['sequences']
+                    sequence = dictio.find('first_split_sequence')
+                    if sequence is not None:
+                        dict_prev = results[i - 1]
+                        param = sequence.split(' ')
+                        seq_all_id = dictio.find('all_id_sequence')
+                        seq_half_id = dictio.find('half_id_sequence')
+                        if seq_all_id is not None or seq_half_id is not None:
+                            if seq_all_id is not None:  # If the split was after a space, then there is all id
+                                param_seq_prev = seq_all_id.split(' ')
+                                name_id = param_seq_prev[0].replace('<->', '')
+                            else:
+                                param_seq_prev = seq_half_id.split(' ')
+                                name_id = param_seq_prev[0].replace('<_>', '') + param[5].replace('^', '')
+                            length = param[4].split('-')[1]
+                            offset_head = param_seq_prev[1]
+                            offset_base = param[3].split('-')[1]
+                            dict['name_sequence'][0] = name_id  # Update data
+                            split = 0
+                            # Update ranges
+                            dict['min_range'] = int(offset_head)
+                            dict_prev['max_range'] = int(offset_head)
+                        else:
+                            seq_prev = dictio.find(dict_prev['name_sequence'][-1])
+                            if seq_prev is not None:
+                                param_seq_prev = seq_prev.split(' ')
+                                length = param[4].split('-')[0]
+                                name_id = param_seq_prev[0]
+                                offset_head = param_seq_prev[2]
+                                offset_base = param[3].split('-')[0]
+                                split = int(param_seq_prev[1])
+                                # Update number of partitions of the sequence
+                                self.__update_number_of_partitions(split, i, results)
+                        sequence = self.__update_data_hastab_with_raplace(dictio, name_id, sequence, f' {param[5]}', '')  # Remove 4rt param
+                        sequence = self.__update_data_hastab_with_raplace(dictio, name_id, sequence, f' {param[3]} ', f' {offset_base} ')  # [offset_base_0-offset_base_1|offset_base] -> offset_base
+                        sequence = self.__update_data_hastab_with_raplace(dictio, name_id, sequence, f' {param[4]}', f' {length}')  # [length_0-length_1|length] -> length
+                        sequence = self.__update_data_hastab_with_raplace(dictio, name_id, sequence, ' <X> ', f' {str(split + 1)} ')  # X --> num_chunks_has_divided
+                        sequence = self.__update_data_hastab_with_raplace(dictio, name_id, sequence, ' <Y> ', f' {offset_head} ')  # Y --> offset_head
+                        self.__update_data_hastab_with_raplace(dictio, name_id, sequence, '>> ', f'{name_id} ')  # '>>' -> name_id'''
+        return res
+
+    def __generate_index_file(self, data, dt_dir):
+        print(data)
+        '''with open(f'{dt_dir}.fastai', 'w') as f:
+            f.write(f"{dict['min_range']}-{dict['max_range']}\n")
+                for sequence in dict['name_sequence']:
+                    f.write(f"{sequence}: {dict['sequences'].find(sequence)}\n")'''
+
+        # utf-8
 
     def __generate_fasta_index(self, key, workers):
         fexec = lithops.FunctionExecutor(max_workers=2000, runtime_memory=4096)  # log_level='DEBUG
@@ -159,7 +208,7 @@ class FastaPartitioner:
         fexec.wait()
         results = fexec.get_result()
 
-        self.__generate_json(results, f'./output_data/{pathlib.Path(key).stem}_index')
+        self.__generate_index_file(results, f'./output_data/{pathlib.Path(key).stem}')
 
         print('... Done, generated index')
 
@@ -167,7 +216,11 @@ class FastaPartitioner:
         fexec.clean()
 
 
-def get_info_sequence(data, identifier):
+# TODO: actualizar función con el nuevo formato
+def get_info_sequence(path_data, identifier):
+    with open(path_data, 'r') as d:
+        sequence = d.readline()
+    # Not updated
     length = offset_head = offset = -1
     found = False
     if identifier != '':
@@ -193,7 +246,16 @@ def get_info_sequence(data, identifier):
     return {'length': length, 'offset_head': offset_head, 'offset': offset}
 
 
-def get_sequences_of_range(data, min_range, max_range):
+# TODO: actualizar función con el nuevo formato
+def get_sequences_of_range(path_data, min_range, max_range):
+    with open(path_data, 'r') as d:
+        sequence = d.readline()
+        # while sequence and sequence != '\n'
+        # param = sequence.split(' ') #
+        # if f'{min_ranfe}-{max_range}' == sequence[4]
+        # ...
+        sequence = d.readline()
+    # Not updated
     sequences = []
     for i, dict in enumerate(data):
         if dict['min_range'] == min_range and dict['max_range'] == max_range:
