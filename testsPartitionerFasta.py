@@ -5,7 +5,7 @@ import re
 import fastaPartitionerIndex as fp
 import random
 
-result = []
+results = []
 class TestPartitionOptions(unittest.TestCase):
     def setUp(self):
         with open('./output_data/genes_index.json', "r") as f:
@@ -30,14 +30,16 @@ class TestPartitionOptions(unittest.TestCase):
                 self.assertEqual([el[0], info['length'], info['offset']], [el[0], int(el[1]), int(el[2])])
 
     def test_get_range_sequence(self):
-        #list = [{'min': dict['min_range'], 'max': dict['max_range']} for dict in self.data]
-        #range = list[random.randint(0, len(list))]
-        result.append(f"Test 'test_get_range_sequence'")
+        results.append(f"Test 'test_get_range_sequence'")
         for el in self.data:
             sequences = fp.get_sequences_of_range(self.data, el['min_range'], el['max_range'])
             self.assertEqual(len(sequences), len(el['sequences']))
-            result.append(f"{el['min_range']}-{el['max_range']}: {sequences[0]}")
-
+            #results.append(f"{el['min_range']}-{el['max_range']}: {sequences[0]}")
+        list = [[9643, 36109], [60411, 70827], [113494, 120950], [473060, 717220], [949179, 957690]]
+        for i in list:
+            sequences = fp.get_sequences_of_range(self.data, i[0], i[1])
+            results.append(f"{i[0]}-{i[1]}: {sequences[0]}\t\t{sequences[-1]}")
+            results.append(str(sequences) + '\n')
     def test_index_generated(self):
         j = 0
         last_seq = ''
