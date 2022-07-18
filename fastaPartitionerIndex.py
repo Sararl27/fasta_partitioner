@@ -206,7 +206,7 @@ def get_sequences_of_range(data, min_range, max_range):
         i_min_range = -1
         i_max_range = -1
         for i, dict in enumerate(data):
-            if dict['min_range'] == min_range and dict['max_range'] == max_range:
+            if dict['min_range'] == min_range and dict['max_range'] == max_range:  # If it is the default ranges
                 split = int(dict['sequences'][0].split(' ')[1])
                 get_sequences(dict['sequences'], data[i - split + 1]['sequences'], split, sequences, 0)
                 for e in dict['sequences'][1::]:
@@ -220,7 +220,7 @@ def get_sequences_of_range(data, min_range, max_range):
                 if i_min_range != -1 and i_max_range != -1:
                     break
 
-        if i_min_range != -1 and i_max_range != -1:
+        if i_min_range != -1 and i_max_range != -1: # If it is not the default ranges
             first_pos = binary_search(data[i_min_range], min_range, 'min')
             last_pos = binary_search(data[i_max_range], max_range, 'max')
             dict_min = data[i_min_range]
