@@ -243,7 +243,7 @@ def get_sequences_of_range(data, min_range, max_range):
                     split = int(data[i]['sequences'][start].split(' ')[1])
                     if i == i_min_range and start == 0 or split == 1:
                         get_sequences(data[i]['sequences'], data[i - split + 1]['sequences'], split, sequences, start)
-                    elif i == i_min_range and start == end - 1: # If it is the last sequence in the first dictionary in the range and is split
+                    elif i == i_min_range and start == end - 1:  # If it is the last sequence in the first dictionary in the range and is split
                         sequences.append(data[i]['sequences'][start].split(' ')[0])
                     for e in data[i]['sequences'][start + 1:end]:
                         sequences.append(e.split(' ')[0])
