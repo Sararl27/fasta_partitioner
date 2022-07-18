@@ -1,4 +1,5 @@
 import json
+import os
 import pathlib
 import re
 import lithops
@@ -129,8 +130,11 @@ class FastaPartitioner:
                     dictio[0] = dictio[0].replace('>> ', f'{name_id} ')  # '>>' -> name_id
         return results
 
-    def __generate_json(self, data, dt_dir):
-        with open(f'{dt_dir}.json', 'w') as f:
+    def __generate_json(self, data, file_name):
+        output_path = './output_data/'
+        if not os.path.exists(output_path):
+            os.mkdir(output_path)
+        with open(f'{output_path}{file_name}.json', 'w') as f:
             json.dump(data, f, indent=2)
 
     def __generate_fasta_index(self, key, workers):
@@ -158,132 +162,135 @@ class FastaPartitioner:
         fexec.wait()
         results = fexec.get_result()
 
-        self.__generate_json(results, f'./output_data/{pathlib.Path(key).stem}_index')
-
-        print('... Done, generated index')
+        self.__generate_json(results, f'{pathlib.Path(key).stem}_index')
 
         # fexec.plot()
         fexec.clean()
 
-
-def get_info_sequence(data, identifier):
-    length = offset_head = offset = -1
-    found = False
-    if identifier != '':
-        for i, dict in enumerate(data):
-            for j, sequence in enumerate(dict['sequences']):
-                if identifier in sequence:
-                    found = True
-                    param_seq = sequence.split(' ')
-                    split = int(param_seq[1])
-                    if split > 1:
-                        length = 0
-                        for x in range(i + 1, i + split):
-                            length += int(data[x]['sequences'][0].split(' ')[4])
-                        length += int(param_seq[4])
-                    else:
-                        length = int(param_seq[4])
-                    offset_head = int(param_seq[2])
-                    offset = int(param_seq[3])
-                    break
-            if found:
-                break
-
-    return {'length': length, 'offset_head': offset_head, 'offset': offset}
+        print('... Done, generated index')
 
 
-def get_sequences(dict_seqs, previous_dict_seqs, split, sequences, index):
-    if split > 1:
-        seq_prev = previous_dict_seqs[-1]
-        sequences.append({'identifier': seq_prev.split(' ')[0], 'offset': seq_prev.split(' ')[3]})
-    else:
-        sequences.append(dict_seqs[index].split(' ')[0])
+class FunctionsFastaIndex:
+    def __init__(self, path_index_file):
+        with open(path_index_file, "r") as f:
+            self.data = json.load(f)
 
-
-def get_sequences_of_range(data, min_range, max_range):
-    sequences = []
-    if min_range < max_range:
-        i_min_range = -1
-        i_max_range = -1
-        for i, dict in enumerate(data):
-            if dict['min_range'] == min_range and dict['max_range'] == max_range:  # If it is the default ranges
-                split = int(dict['sequences'][0].split(' ')[1])
-                get_sequences(dict['sequences'], data[i - split + 1]['sequences'], split, sequences, 0)
-                for e in dict['sequences'][1::]:
-                    sequences.append(e.split(' ')[0])
-                break
-            else:
-                if dict['min_range'] <= min_range <= dict['max_range']:
-                    i_min_range = i
-                if dict['min_range'] <= max_range <= dict['max_range']:
-                    i_max_range = i
-                if i_min_range != -1 and i_max_range != -1:
+    def get_info_sequence(self, identifier):
+        length = offset_head = offset = -1
+        found = False
+        if identifier != '':
+            for i, dict in enumerate(self.data):
+                for j, sequence in enumerate(dict['sequences']):
+                    if identifier in sequence:
+                        found = True
+                        param_seq = sequence.split(' ')
+                        split = int(param_seq[1])
+                        if split > 1:
+                            length = 0
+                            for x in range(i + 1, i + split):
+                                length += int(self.data[x]['sequences'][0].split(' ')[4])
+                            length += int(param_seq[4])
+                        else:
+                            length = int(param_seq[4])
+                        offset_head = int(param_seq[2])
+                        offset = int(param_seq[3])
+                        break
+                if found:
                     break
 
-        if i_min_range != -1 and i_max_range != -1: # If it is not the default ranges
-            first_pos = binary_search(data[i_min_range], min_range, 'min')
-            last_pos = binary_search(data[i_max_range], max_range, 'max')
-            dict_min = data[i_min_range]
-            if i_min_range == i_max_range:    # If it is the same dictionary
-                split = int(dict_min['sequences'][first_pos].split(' ')[1])
-                get_sequences(dict_min['sequences'], data[i - split + 1]['sequences'], split, sequences, first_pos)
-                for e in data[i_min_range]['sequences'][first_pos + 1:last_pos]:
-                    sequences.append(e.split(' ')[0])
-            else:
-                for i in range(i_min_range, i_max_range + 1):
-                    if i == i_min_range:
-                        start = first_pos
-                        end = len(data[i]['sequences'])
-                    elif i == i_max_range:
-                        start = 0
-                        end = last_pos
-                    else:
-                        start = 0
-                        end = len(data[i]['sequences'])
-                    split = int(data[i]['sequences'][start].split(' ')[1])
-                    if i == i_min_range and start == 0 or split == 1:
-                        get_sequences(data[i]['sequences'], data[i - split + 1]['sequences'], split, sequences, start)
-                    elif i == i_min_range and start == end - 1:  # If it is the last sequence in the first dictionary in the range and is split
-                        sequences.append(data[i]['sequences'][start].split(' ')[0])
-                    for e in data[i]['sequences'][start + 1:end]:
+        return {'length': length, 'offset_head': offset_head, 'offset': offset}
+
+    def __get_sequences(self, dict_seqs, previous_dict_seqs, split, sequences, index):
+        if split > 1:
+            seq_prev = previous_dict_seqs[-1]
+            sequences.append({'identifier': seq_prev.split(' ')[0], 'offset': seq_prev.split(' ')[3]})
+        else:
+            sequences.append(dict_seqs[index].split(' ')[0])
+
+    def get_sequences_of_range(self, min_range, max_range):
+        sequences = []
+        if min_range < max_range:
+            i_min_range = -1
+            i_max_range = -1
+            for i, dict in enumerate(self.data):
+                if dict['min_range'] == min_range and dict['max_range'] == max_range:  # If it is the default ranges
+                    split = int(dict['sequences'][0].split(' ')[1])
+                    self.__get_sequences(dict['sequences'], self.data[i - split + 1]['sequences'], split, sequences, 0)
+                    for e in dict['sequences'][1::]:
                         sequences.append(e.split(' ')[0])
-    return sequences
+                    break
+                else:
+                    if dict['min_range'] <= min_range <= dict['max_range']:
+                        i_min_range = i
+                    if dict['min_range'] <= max_range <= dict['max_range']:
+                        i_max_range = i
+                    if i_min_range != -1 and i_max_range != -1:
+                        break
 
-def binary_search(dict, x, side):
-    if side == 'min' or side == 'max':
-        arr = dict['sequences']
-        length = len(arr) - 1
-        low = 0
-        high = length
-        mid = 0
+            if i_min_range != -1 and i_max_range != -1: # If it is not the default ranges
+                first_pos = self.__binary_search_modified(self.data[i_min_range], min_range, 'min')
+                last_pos = self.__binary_search_modified(self.data[i_max_range], max_range, 'max')
+                dict_min = self.data[i_min_range]
+                if i_min_range == i_max_range:    # If it is the same dictionary
+                    split = int(dict_min['sequences'][first_pos].split(' ')[1])
+                    self.__get_sequences(dict_min['sequences'], self.data[i - split + 1]['sequences'], split, sequences, first_pos)
+                    for e in self.data[i_min_range]['sequences'][first_pos + 1:last_pos]:
+                        sequences.append(e.split(' ')[0])
+                else:
+                    for i in range(i_min_range, i_max_range + 1):
+                        if i == i_min_range:
+                            start = first_pos
+                            end = len(self.data[i]['sequences'])
+                        elif i == i_max_range:
+                            start = 0
+                            end = last_pos
+                        else:
+                            start = 0
+                            end = len(self.data[i]['sequences'])
+                        split = int(self.data[i]['sequences'][start].split(' ')[1])
+                        if i == i_min_range and start == 0 or split == 1:
+                            self.__get_sequences(self.data[i]['sequences'], self.data[i - split + 1]['sequences'], split, sequences, start)
+                        elif i == i_min_range and start == end - 1:  # If it is the last sequence in the first dictionary in the range and is split
+                            sequences.append(self.data[i]['sequences'][start].split(' ')[0])
+                        for e in self.data[i]['sequences'][start + 1:end]:
+                            sequences.append(e.split(' ')[0])
+        return sequences
 
-        while low <= high:
-            mid = (high + low) // 2
-            # If x is greater, ignore left half
-            param = arr[mid].split(' ')
-            offset = int(param[3] if param[1] != '1' and mid == 0 else param[2])
-            if offset < x:
-                low = mid + 1
-            # If x is smaller, ignore right half
-            elif offset > x:
-                high = mid - 1
-            # means x is present at mid
-            else:
-                return mid
+    def __binary_search_modified(self, dict, x, side):
+        if side == 'min' or side == 'max':
+            arr = dict['sequences']
+            length = len(arr) - 1
+            low = 0
+            high = length
+            mid = 0
 
-        if mid == length and offset < x:
-            return dict['max_range'] if side == 'min' else length
-        elif mid == 0 and x < offset:
-            return 0 if side == 'min' else dict['min_range']
-        else:   # 0 <= mid <= length
-            if mid != 0:
-                param = arr[mid - 1].split(' ')
-                offset2 = int(param[3] if param[1] != '1' and mid == 0 else param[2])
-                if offset2 < x < offset:
-                    return mid if side == 'min' else mid - 1
-            if mid != length:
-                param = arr[mid + 1].split(' ')
-                offset2 = int(param[3] if param[1] != '1' and mid == 0 else param[2])
-                if offset < x < offset2:
-                    return mid + 1 if side == 'min' else (mid if mid != 0 else dict['min_range'])
-    return -1
+            while low <= high:
+                mid = (high + low) // 2
+                # If x is greater, ignore left half
+                param = arr[mid].split(' ')
+                offset = int(param[3] if param[1] != '1' and mid == 0 else param[2])
+                if offset < x:
+                    low = mid + 1
+                # If x is smaller, ignore right half
+                elif offset > x:
+                    high = mid - 1
+                # means x is present at mid
+                else:
+                    return mid
+
+            if mid == length and offset < x:
+                return dict['max_range'] if side == 'min' else length
+            elif mid == 0 and x < offset:
+                return 0 if side == 'min' else dict['min_range']
+            else:   # 0 <= mid <= length
+                if mid != 0:
+                    param = arr[mid - 1].split(' ')
+                    offset2 = int(param[3] if param[1] != '1' and mid == 0 else param[2])
+                    if offset2 < x < offset:
+                        return mid if side == 'min' else mid - 1
+                if mid != length:
+                    param = arr[mid + 1].split(' ')
+                    offset2 = int(param[3] if param[1] != '1' and mid == 0 else param[2])
+                    if offset < x < offset2:
+                        return mid + 1 if side == 'min' else (mid if mid != 0 else dict['min_range'])
+        return -1
