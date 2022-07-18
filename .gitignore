@@ -1,3 +1,4 @@
 
 .idea/
 /input_data/genes.fasta
+/output_data/genes_index.json
