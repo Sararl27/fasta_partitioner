@@ -56,7 +56,7 @@ if __name__ == "__main__":
     key = f'fasta/genes.fasta'  # Change me
     obj = f'{data_bucket}/{key}'  # f'cos://{data_bucket}/{key}'  # Change me
 
-    workers = 1000  # Change me
+    workers = 4000  # Change me
 
     # Execution
     #generate_fasta_index_pyfaidx()

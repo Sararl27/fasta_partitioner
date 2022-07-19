@@ -115,36 +115,12 @@ class FastaIndex:
             elif not miss_prev_seq and len_head != 0:  # Add length of bases to last sequence
                 self.__get_length(min_range, ht, seq_prev, data, prev, max_range)
 
-        '''res = []
-
-        x = y = 0
-        for i in content:
-            if not ht.find(i):
-                x += 1
-            y += 1
-        res.append(f'{x}/{y}')'''
-
         return {'min_range': min_range,
                 'max_range': max_range,
                 'sequences': ht,  # if not miss_prev_seq else None
                 'name_sequence': content}  # if not miss_prev_seq else None
 
     def __reduce_generate_chunks(self, results):
-        '''x = y = 0
-        for i in results:
-            x += int(i[0].split('/')[0])
-            y += int(i[0].split('/')[1])
-        results = f'{x}/{y}'''
-        res = []
-
-        x = y = 0
-        for e in results:
-            for i in e['name_sequence']:
-                if not e['sequences'].find(i):
-                    x += 1
-                y += 1
-        res.append(f'{x}/{y}')
-                #res.append(e['sequences'].find(i))
         '''if len(results) > 1:
             for i, dict in enumerate(results):
                 if dict['sequences'] is not None:
@@ -187,14 +163,12 @@ class FastaIndex:
                         sequence = self.__update_data_hastab_with_raplace(dictio, name_id, sequence, ' <X> ', f' {str(split + 1)} ')  # X --> num_chunks_has_divided
                         sequence = self.__update_data_hastab_with_raplace(dictio, name_id, sequence, ' <Y> ', f' {offset_head} ')  # Y --> offset_head
                         self.__update_data_hastab_with_raplace(dictio, name_id, sequence, '>> ', f'{name_id} ')  # '>>' -> name_id'''
-        return res
+        return results
 
     def __generate_index_file(self, data, dt_dir):
-        print(data)
-        '''with open(f'{dt_dir}.fastai', 'w') as f:
-            f.write(f"{dict['min_range']}-{dict['max_range']}\n")
-                for sequence in dict['name_sequence']:
-                    f.write(f"{sequence}: {dict['sequences'].find(sequence)}\n")'''
+        with open(f'{dt_dir}.fastai', 'w') as f:
+            f.write(data) # TODO: update with the new format
+
 
         # utf-8
 
@@ -231,7 +205,7 @@ class FastaIndex:
         fexec.clean()
 
 
-# TODO: actualizar función con el nuevo formato
+# TODO: update with the new format
 class FunctionsFastaIndex:
     def __init__(self, path_index_file):
         with open(path_index_file, "r") as f:
