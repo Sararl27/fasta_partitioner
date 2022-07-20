@@ -1,16 +1,16 @@
-import re
+import os
 import unittest
 
+import lithops
 from pyfaidx import Fasta
 
-import lithops
-import os
 import fastaPartitionerIndex as fp
 import testsPartitionerFasta
 
 
 def push_object_funct(local_input_path, data_bucket, input_data_prefix):
     bucket_objects = storage.list_keys(bucket=data_bucket)
+    #storage.delete_objects(bucket=data_bucket, key_list=bucket_objects)
     for subdir, dirs, files in os.walk(local_input_path):
         print(subdir)
         for file_name in files:
@@ -29,9 +29,8 @@ def push_object_funct(local_input_path, data_bucket, input_data_prefix):
 
 
 def generate_fasta_index_pyfaidx():
-    genes = Fasta('input_data/genes.fasta')
-    with open('./input_data/genes.fasta.fai', "w") as f:
-        f.write(genes)
+    Fasta('input_data/genes.fasta')
+    print("Fasta index 'pyfaidx' done")
 
 
 def generate_fasta_index_own(local_input_path, data_bucket, prefix, storage, key, workers):
@@ -50,9 +49,9 @@ if __name__ == "__main__":
     storage = lithops.Storage()
 
     # Params
-    data_bucket = 'cloud-fasta-partitioner'  # Change me
+    data_bucket = 'fasta-partitioner'  # Change me
     prefix = 'fasta/'  # Change me
-    local_input_path = './input_data/genes.fasta'  # Change me
+    local_input_path = './input_data'  # Change me
 
     key = f'fasta/genes.fasta'  # Change me
     obj = f'{data_bucket}/{key}'  # f'cos://{data_bucket}/{key}'  # Change me

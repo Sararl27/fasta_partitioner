@@ -1,4 +1,4 @@
-import json
+import pickle
 import os
 import pathlib
 import re
@@ -130,12 +130,12 @@ class FastaPartitioner:
                     dictio[0] = dictio[0].replace('>> ', f'{name_id} ')  # '>>' -> name_id
         return results
 
-    def __generate_json(self, data, file_name):
+    def __generate_index_file(self, data, file_name):
         output_path = './output_data/'
         if not os.path.exists(output_path):
             os.mkdir(output_path)
-        with open(f'{output_path}{file_name}.json', 'w') as f:
-            json.dump(data, f, indent=2)
+        with open(f'{output_path}{file_name}_index.pkl', 'wb') as f:
+            pickle.dump(data, f, protocol=pickle.HIGHEST_PROTOCOL)
 
     def __generate_fasta_index(self, key, workers):
         fexec = lithops.FunctionExecutor(max_workers=2000, runtime_memory=4096)  # log_level='DEBUG
@@ -162,7 +162,7 @@ class FastaPartitioner:
         fexec.wait()
         results = fexec.get_result()
 
-        self.__generate_json(results, f'{pathlib.Path(key).stem}_index')
+        self.__generate_index_file(results, f'{pathlib.Path(key).stem}')
 
         # fexec.plot()
         fexec.clean()
@@ -172,8 +172,8 @@ class FastaPartitioner:
 
 class FunctionsFastaIndex:
     def __init__(self, path_index_file):
-        with open(path_index_file, "r") as f:
-            self.data = json.load(f)
+        with open(path_index_file, "rb") as f:
+            self.data = pickle.load(f)
 
     def get_info_sequence(self, identifier):
         length = offset_head = offset = -1

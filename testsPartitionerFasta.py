@@ -1,15 +1,14 @@
 import unittest
 import json
+import pickle
 import fastaPartitionerIndex as fp
 import random
 
 results = []
 class TestPartitionOptions(unittest.TestCase):
     def setUp(self):
-        self.path_data_file = './output_data/genes_index.json'
+        self.path_data_file = './output_data/genes_index.pkl'
         self.functions = fp.FunctionsFastaIndex(self.path_data_file)
-        with open(self.path_data_file, "r") as f:
-            self.data = json.load(f)
         with open('./input_data/genes.fasta.fai', "r") as f:
             self.data_assert = f.read().splitlines()
 
@@ -31,7 +30,7 @@ class TestPartitionOptions(unittest.TestCase):
 
     def test_get_range_sequence(self):
         results.append(f"Test 'test_get_range_sequence'")
-        for el in self.data:
+        for el in self.functions.data:
             sequences = self.functions.get_sequences_of_range(el['min_range'], el['max_range'])
             self.assertEqual(len(sequences), len(el['sequences']))
             #results.append(f"{el['min_range']}-{el['max_range']}: {sequences[0]}")
@@ -44,7 +43,7 @@ class TestPartitionOptions(unittest.TestCase):
     def test_index_generated(self):
         j = 0
         last_seq = ''
-        for i, dict in enumerate(self.data):
+        for i, dict in enumerate(self.functions.data):
             for sequence in dict['sequences']:
                 info = sequence.split(' ')
                 if last_seq != info[0]:
@@ -52,7 +51,7 @@ class TestPartitionOptions(unittest.TestCase):
                     if split > 1:
                         length = 0
                         for x in range(i + 1, i + split):
-                            length += int(self.data[x]['sequences'][0].split(' ')[4])
+                            length += int(self.functions.data[x]['sequences'][0].split(' ')[4])
                         length += int(info[4])
                         info[4] = str(length)
                     info_assert = self.data_assert[j].split('\t')
