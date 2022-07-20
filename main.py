@@ -1,9 +1,7 @@
 import os
 import unittest
-
 import lithops
 from pyfaidx import Fasta
-
 import fastaPartitionerIndex as fp
 import testsPartitionerFasta
 
