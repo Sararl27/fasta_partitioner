@@ -1,6 +1,4 @@
 import unittest
-import json
-import pickle
 import fastaPartitionerIndex as fp
 import random
 
