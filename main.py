@@ -1,15 +1,16 @@
+import os
 import unittest
 
+import lithops
 from pyfaidx import Fasta
 
-import lithops
-import os
 import fastaPartitionerIndex as fp
 import testsPartitionerFasta
 
 
 def push_object_funct(local_input_path, data_bucket, input_data_prefix):
     bucket_objects = storage.list_keys(bucket=data_bucket)
+    #storage.delete_objects(bucket=data_bucket, key_list=bucket_objects)
     for subdir, dirs, files in os.walk(local_input_path):
         print(subdir)
         for file_name in files:
@@ -28,41 +29,38 @@ def push_object_funct(local_input_path, data_bucket, input_data_prefix):
 
 
 def generate_fasta_index_pyfaidx():
-    genes = Fasta('input_data/genes.fasta')
-    with open('./input_data/genes.fasta.fai', "w") as f:
-        f.write(genes)
+    Fasta('input_data/genes.fasta')
+    print("Fasta index 'pyfaidx' done")
 
 
 def generate_fasta_index_own(local_input_path, data_bucket, prefix, storage, key, workers):
     push_object_funct(local_input_path, data_bucket, prefix)
-    fp.FastaIndex(storage, data_bucket, key, workers)
+    fp.FastaPartitioner(storage, data_bucket, key, workers)
 
 
 def test_partitioner_fasta():
     unittest.TextTestRunner(verbosity=2).run(unittest.TestLoader().loadTestsFromModule(testsPartitionerFasta))
-    #print(f'{testsPartitionerFasta.result[0]}:')
-    #for i in testsPartitionerFasta.result[1:]:
-    #    print(f'\t{i}')
+    print(f'{testsPartitionerFasta.results[0]}:')
+    for i in testsPartitionerFasta.results[1::]:
+        print(f'\t{i}')
 
 
 if __name__ == "__main__":
     storage = lithops.Storage()
 
     # Params
-    data_bucket = 'cloud-fasta-partitioner'  # Change me
+    data_bucket = 'fasta-partitioner'  # Change me
     prefix = 'fasta/'  # Change me
-    local_input_path = './input_data/genes.fasta'  # Change me
+    local_input_path = './input_data'  # Change me
 
     key = f'fasta/genes.fasta'  # Change me
     obj = f'{data_bucket}/{key}'  # f'cos://{data_bucket}/{key}'  # Change me
 
-    workers = 4000  # Change me
+    workers = 1000  # Change me
 
     # Execution
     #generate_fasta_index_pyfaidx()
-    generate_fasta_index_own(local_input_path, data_bucket, prefix, storage, key, workers)
+    #generate_fasta_index_own(local_input_path, data_bucket, prefix, storage, key, workers)
 
     # run all tests with verbosity
-    #test_partitioner_fasta()
-    # TODO descubrir pq da diferente offset de base entre ['tr|A0A068S3P6|A0A068S3P6_9FUNG', '1054', '1191018'] y ['tr|A0A068S3P6|A0A068S3P6_9FUNG', '1054', '1191156']
-
+    # test_partitioner_fasta()

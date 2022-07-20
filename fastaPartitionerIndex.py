@@ -1,5 +1,6 @@
-import json
+import os
 import pathlib
+import pickle
 import re
 import lithops
 from cuckooHash import HashTab
@@ -165,12 +166,12 @@ class FastaIndex:
                         self.__update_data_hastab_with_raplace(dictio, name_id, sequence, '>> ', f'{name_id} ')  # '>>' -> name_id'''
         return results
 
-    def __generate_index_file(self, data, dt_dir):
-        with open(f'{dt_dir}.fastai', 'w') as f:
-            f.write(data) # TODO: update with the new format
-
-
-        # utf-8
+    def __generate_index_file(self, data, file_name):
+            output_path = './output_data/'
+            if not os.path.exists(output_path):
+                os.mkdir(output_path)
+            with open(f'{output_path}{file_name}_index.pkl', 'wb') as f:
+                pickle.dump(data, f, protocol=pickle.HIGHEST_PROTOCOL)
 
     def __generate_fasta_index(self, key, workers):
         fexec = lithops.FunctionExecutor(max_workers=2000, runtime_memory=4096)  # log_level='DEBUG
@@ -208,8 +209,8 @@ class FastaIndex:
 # TODO: update with the new format
 class FunctionsFastaIndex:
     def __init__(self, path_index_file):
-        with open(path_index_file, "r") as f:
-            self.data = json.load(f)
+        with open(path_index_file, "rB") as f:
+            self.data = pickle.load(f)
 
     def get_info_sequence(self, identifier):
         length = offset_head = offset = -1
