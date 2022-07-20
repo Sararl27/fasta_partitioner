@@ -122,7 +122,7 @@ class FastaIndex:
                 'name_sequence': content}  # if not miss_prev_seq else None
 
     def __reduce_generate_chunks(self, results):
-        ''' if len(results) > 1:
+        '''if len(results) > 1:
             for i, dict in enumerate(results):
                 if dict['sequences'] is not None:
                     dictio = dict['sequences']

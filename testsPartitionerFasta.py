@@ -3,6 +3,7 @@ import fastaPartitionerIndex as fp
 import random
 
 results = []
+
 class TestPartitionOptions(unittest.TestCase):
     def setUp(self):
         self.path_data_file = './output_data/genes_index.pkl'
