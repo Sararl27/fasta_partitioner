@@ -40,7 +40,7 @@ class FastaIndex:
                                                        f' {split + 1} ')  # num_chunks_has_divided + 1 (i+1: total of current partitions of sequence))
 
     def __update_data_hastab_with_raplace(self, hastab, key, sequence, before, after):
-        hastab.delete(key)  # If the key was found and deleted
+        hastab.delete(key)
         seq = sequence.replace(before, after)
         hastab.insert(key, seq)
         return seq
@@ -206,7 +206,6 @@ class FastaIndex:
         fexec.clean()
 
 
-# TODO: update with the new format
 class FunctionsFastaIndex:
     def __init__(self, path_index_file):
         with open(path_index_file, "rB") as f:
